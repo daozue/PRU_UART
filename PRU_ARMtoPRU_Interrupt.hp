@@ -1,0 +1,227 @@
+#ifndef _PRU_ARMTOPRU_INTERRUPT_HP_
+#define _PRU_ARMTOPRU_INTERRUPT_HP_
+
+
+// ***************************************
+// *      Global Macro definitions       *
+// ***************************************
+#define CONST_PRUSSINTC  C0
+#define CONST_PRUDRAM    C3
+#define CONST_HPI        C15
+#define CONST_DSPL2      C28
+#define CONST_L3RAM      C30
+#define CONST_DDR        C31
+#define CONST_PRUDRAMIND C24
+
+// ***************************************
+// *    Global Structure Definitions     *
+// ***************************************
+.struct Global      // r0 r1 
+    .u32 regPointer //指针&延时子程序
+    .u32 regVal     //数据&握手程序
+.ends
+
+.struct Para         // r2-r6
+	.u32 p1poi       //存放数据内容  r2       	
+	.u32 tranlen     //发送数据长度r4
+	.u32 p1add       //存放数据指针地址 r3
+	.u32 temp32		 //临时参数
+	.u8  temp16 
+	.u8  temp8 	 
+	.u8  flag	 		//接收flag r6
+.ends
+
+//用来存储波特率值
+.struct Baudrate    //r7~r9
+	.u32 uart1 		
+	.u32 uart2
+	.u32 uart3
+.ends
+
+//发送数据的buf队列头和尾，以及基地址
+.struct SENDQUEUE  
+	.u16 sendaddrtail_buf_uart1
+	.u16 sendbaseaddr_buf_uart1 //r10
+	.u16 sendaddrhead_buf_uart1
+	
+	.u16 sendaddrtail_buf_uart2 //r11
+	.u16 sendbaseaddr_buf_uart2
+	.u16 sendaddrhead_buf_uart2 //r12
+	
+	.u16 sendaddrtail_buf_uart3
+	.u16 sendbaseaddr_buf_uart3 //r13
+	.u16 sendaddrhead_buf_uart3
+.ends
+
+//发送数据的buf队列头和尾，以及基地址
+.struct RECVQUEUE   //r15
+	.u16 recvaddrtail_buf_uart1  
+	.u16 recvbaseaddr_buf_uart1 
+	.u16 recvaddrhead_buf_uart1  
+	
+	.u16 recvaddrtail_buf_uart2 
+	.u16 recvbaseaddr_buf_uart2	 
+	.u16 recvaddrhead_buf_uart2 
+	
+	.u16 recvaddrtail_buf_uart3  
+	.u16 recvbaseaddr_buf_uart3
+	.u16 recvaddrhead_buf_uart3  
+.ends
+
+.struct CLRBUFFER //r20
+	.u32 block1
+	.u32 block2
+	.u32 block3
+	.u32 block4
+	.u32 block5
+	.u32 block6
+	.u32 block7
+	.u32 block8
+.ends
+
+.struct RECVBUFFER //r28
+	.u32 tmpbuf
+	.u8  cnt
+.ends
+
+
+// Refer to this mapping in the file - \prussdrv\include\pruss_intc_mapping.h
+#define PRU0_PRU1_INTERRUPT     32
+#define PRU1_PRU0_INTERRUPT     33
+#define PRU0_ARM_INTERRUPT      34
+#define PRU1_ARM_INTERRUPT      35
+#define ARM_PRU0_INTERRUPT      36
+#define ARM_PRU1_INTERRUPT      37
+
+// ***************************************
+// *     Global Register Assignments     *
+// ***************************************
+.assign Global, r0, *, global
+.assign Para, r2, *, para
+.assign Baudrate, r7, *, baudrate
+.assign SENDQUEUE,r10,*,sendqueue
+.assign RECVQUEUE,r15,*,recvqueue
+.assign CLRBUFFER,r20,*,clrbuffer
+.assign RECVBUFFER,r28,*,recvbuffer
+
+
+//---- bitreg -----
+#define  Rcv_en1       19//18   //输入
+#define  tran_en1      20//21   //输出
+#define  Rcv_en2       18//19   //输入
+#define  tran_en2      21//20   //输出
+#define  Rcv_en3       22   //输入
+#define  tran_en3      23   //输出
+
+//---- bitreg -----
+//#define  Rcv_en2       18   //输入
+//#define  Rcv_en3       19   //输入
+//#define  tran_en2      20   //输出
+//#define  tran_en3      21   //输出
+//#define  Rcv_en1       22   //输入
+//#define  tran_en1      23   //输出
+
+//------------general --reg--------
+#define eventStatus     r31   // input
+//#define reg_temp  r7 
+
+// *************************************** GPIO **********
+// gpioSet : Set one of the PRU gpio pins through R30
+// Usage:gpioSet	bitNum
+// Sets r30 bit specified in bitNum.
+.macro	gpioSet
+.mparam bitNum
+    SET	r30, r30, bitNum
+.endm
+
+// gpioClr : Clear one of the PRU gpio pins through R30
+// Usage:gpioClr	bitNum
+// Clears r30 bit specified in bitNum.
+.macro	gpioClr
+.mparam bitNum
+  CLR	r30, r30, bitNum
+.endm
+
+.macro  MOV32               
+.mparam dst, src
+    MOV     dst.w0, src & 0xFFFF
+    MOV     dst.w2, src >> 16
+.endm
+
+.macro  LD32
+.mparam dst,src
+    LBBO    dst,src,#0x00,4
+.endm
+
+.macro  LD16
+.mparam dst,src
+    LBBO    dst,src,#0x00,2
+.endm
+
+.macro  LD8
+.mparam dst,src
+    LBBO    dst,src,#0x00,1
+.endm
+
+.macro ST32
+.mparam src,dst
+    SBBO    src,dst,#0x00,4
+.endm
+
+.macro ST16
+.mparam src,dst
+    SBBO    src,dst,#0x00,2
+.endm
+
+.macro ST8
+.mparam src,dst
+    SBBO    src,dst,#0x00,1
+.endm
+
+//difine some flag address for recv and tran
+//cmd区，基地址0x80000000
+#define RECV_STATUS_FLAG_UART1       0x0000   //读地址标志，置0表示上层可以读数据，置1表示PRU正在写数据，上层不能读
+//#define RECV_CONTROL_FLAG_UART1      0x0004   //读地址控制  置0表示PRU可以写数据，置1表示PRU不可以写数据
+#define RECV_STATUS_FLAG_UART2       0x0008
+//#define RECV_CONTROL_FLAG_UART2      0x000c
+#define RECV_STATUS_FLAG_UART3	   	 0x0010
+//#define RECV_CONTROL_FLAG_UART3      0x0014
+                                                                    
+#define TRAN_STATUS_FLAG_UART1       0x0018  //写地址标志  置0表示发送完成，当前状态为空闲，置1表示正在发送，发送完成后，将控制位置0，地址为置0
+#define TRAN_CONTROL_FLAG_UART1      0x001c  //写地址控制  置0表示没有数据需要发送，非0表示有数据要发送，其值就是数据长度。
+#define TRAN_STATUS_FLAG_UART2       0x0020  
+#define TRAN_CONTROL_FLAG_UART2      0x0024  
+#define TRAN_STATUS_FLAG_UART3	     0x0028  
+#define TRAN_CONTROL_FLAG_UART3      0x002c
+                                                                     
+#define BAUDRATE_UART1	0x0030		//波特率
+#define BAUDRATE_UART2	0x0034 
+#define BAUDRATE_UART3	0x0038 
+
+#define BUFHEADTAIL_UART1	0x003c  //记录buf内数据长度，低16位为队列头地址，高16位为队列尾地址。  
+#define BUFHEADTAIL_UART2	0x0040
+#define BUFHEADTAIL_UART3	0x0044
+                
+#define RECVDATA_ADDR_UART1	 		0x0048	//存放数据指针的地址   
+#define SENDDATA_ADDR_UART1			0x004c
+#define RECVDATA_ADDR_UART2   		0x0050
+#define SENDDATA_ADDR_UART2   		0x0054
+#define RECVDATA_ADDR_UART3   		0x0058   
+#define SENDDATA_ADDR_UART3   		0x005c
+
+#define SENDADDR_BUF_UART1			0x0060 //存放发送数据的指针及其长度的地址
+#define SENDADDR_BUF_UART2			0x00a0
+#define SENDADDR_BUF_UART3			0x00e0
+
+//数据区0xc6c00000  
+#define RECVBUF_ADDR_UART1   		0x0000    //细分8块，每块128字节
+#define RECVBUF_ADDR_UART2   		0x0400
+#define RECVBUF_ADDR_UART3   		0x0800
+
+#define SENDBUF_ADDR_UART1   		0x0c00    
+#define SENDBUF_ADDR_UART2   		0x1000
+#define SENDBUF_ADDR_UART3   		0x1400
+   
+
+
+#endif  //__PRU_ARMTOPRU_INTERRUPT_HP_
